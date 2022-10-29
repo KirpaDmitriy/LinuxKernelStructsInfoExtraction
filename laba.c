@@ -8,26 +8,12 @@
 #include <linux/sched.h>
 
 #define MAX_DEBUGFS_SIZE 100
-#define DEBUGFS_INTERFACE_DIR "bubob"
+#define DEBUGFS_INTERFACE_DIR "aub"
 #define DEBUGFS_MEMORY_BLOCK_INTERFACE_FILE "mb"
 
 
 static char debugfs_buffer[MAX_DEBUGFS_SIZE];
 static unsigned long debugfs_buffer_size = 0;
-
-
-int my_atoi(char* string_number) {
-	int int_number = 0;
-	int counter = 0;
-	while((&string_number != '\0') && (counter < MAX_DEBUGFS_SIZE))  {
-		int_number *= 10;
-		int current_digit = &string_number - '0';
-		int_number += current_digit;
-		string_number++;
-		counter++;
-	}
-	return int_number;
-}
 
 
 ssize_t read_interface(struct file * file, char __user * buff, size_t count, loff_t * offset) {
@@ -38,9 +24,10 @@ ssize_t read_interface(struct file * file, char __user * buff, size_t count, lof
 		return 0;
 	}
 	printk("Input : %s\n", debugfs_buffer);
-	int transferred = my_atoi("123");
-	printk("My atoi: %d\n", transferred);
-	int seeked_pid = 1;
+	long transferred;
+	kstrtol(debugfs_buffer, 10, &transferred);
+	printk("Atoi: %d\n", transferred);
+	int seeked_pid = transferred;
 	struct task_struct *task;
 	for_each_process(task) {
 		if(task->pid == seeked_pid) {
