@@ -1,5 +1,0 @@
-   31  alias red="rm !(laba.c|Makefile)"
-   44  alias edit="nano laba.c"
-   81  mkdir aliases
-   82  history | grep alias
-   83  history | grep alias > aliases/cnt

@@ -8,7 +8,7 @@
 #include <linux/sched.h>
 
 #define MAX_DEBUGFS_SIZE 100
-#define DEBUGFS_INTERFACE_DIR "banan"
+#define DEBUGFS_INTERFACE_DIR "ovo"
 #define DEBUGFS_THREAD_STRUCTURE_INTERFACE_FILE "ts"
 #define DEBUGFS_VMA_INTERFACE_FILE "vm"
 
@@ -44,13 +44,17 @@ ssize_t ts_read_interface(struct file * file, char __user * buff, size_t count, 
 		struct thread_struct found_thread = task->thread; // target thread structure
 		
 		// target fields values:
+		unsigned long sp = found_thread.sp;
+		unsigned short es = found_thread.es;
+		unsigned short ds = found_thread.ds;
+		unsigned long iobm = found_thread.io_bitmap;
 		unsigned long ts_error_code = found_thread.error_code;
 		
 		// values to string format:
 		const char fields_values_str[MAX_DEBUGFS_SIZE];
-		const char format_answer[] = "Error code: %u\n";
-		size_t string_size = snprintf(NULL, 0, format_answer, ts_error_code) + 1;
-		snprintf(fields_values_str, string_size, format_answer, ts_error_code);
+		const char format_answer[] = "Stack pointer: %u\nES register: %u\nDS register: %u\nIO: %u\nError code: %u\n";
+		size_t string_size = snprintf(NULL, 0, format_answer, sp, es, ds, iobm, ts_error_code) + 1;
+		snprintf(fields_values_str, string_size, format_answer, sp, es, ds, iobm, ts_error_code);
 		copy_to_user(buff, fields_values_str, string_size);
 		read_status = string_size;
 	}
@@ -80,10 +84,28 @@ ssize_t vma_read_interface(struct file * file, char __user * buff, size_t count,
 		read_status = 0;
 		return 0;
 	}
-	printk("VMA read input: %s\n", vma_buffer);
-	long seeked_pid = 1;
-	kstrtol(vma_buffer, 10, &seeked_pid);
-	printk("VMA read input atoi: %d\n", seeked_pid);
+	size_t split_counter = 0;
+	char string_seeked_pid[MAX_DEBUGFS_SIZE];
+	char string_seeked_vma[MAX_DEBUGFS_SIZE];
+	while((split_counter < vma_buffer_size) && (vma_buffer[split_counter] != ' ')) {
+		string_seeked_pid[split_counter] = vma_buffer[split_counter];
+		split_counter++;
+	}
+	string_seeked_pid[split_counter] = '\0';
+	printk("VMA seeked PID: %s", string_seeked_pid);
+	split_counter++;
+	size_t freeze_counter = split_counter;
+	while(split_counter < vma_buffer_size) {
+		string_seeked_vma[split_counter - freeze_counter] = vma_buffer[split_counter];
+		split_counter++;
+	}
+	string_seeked_vma[split_counter - freeze_counter] = '\0';
+	printk("VMA seeked region: %s", string_seeked_vma);
+	long seeked_pid = -1, seeked_reg = -1;
+	kstrtol(string_seeked_pid, 10, &seeked_pid);
+	kstrtol(string_seeked_vma, 10, &seeked_reg);
+	printk("VMA seeked PID atoi: %d\n", seeked_pid);
+	printk("VMA seeked region atoi: %d\n", seeked_reg);
 	struct task_struct *task;
 	int found_flag = 0;
 	for_each_process(task) {
@@ -92,20 +114,22 @@ ssize_t vma_read_interface(struct file * file, char __user * buff, size_t count,
 			break;
 		}
 	}
-	if(found_flag == 1) {
+	if((found_flag == 1) && (task->mm != NULL) && (seeked_reg != -1)) {
 		char result[MAX_DEBUGFS_SIZE];
-		struct vm_area_struct *found_vma = task->mm->mmap; // target virtual memory areas list
+		struct mm_struct *found_mm = task->mm; // mm containing target virtual memory areas list
+		struct vm_area_struct *found_vma = find_vma(found_mm, 10000);
 		
 		// target fields values:
 		unsigned long vm_start = found_vma->vm_start;
 		unsigned long vm_end = found_vma->vm_end;
+		unsigned long vm_flags = found_vma->vm_flags;
+		unsigned long vm_offset = found_vma->vm_pgoff;
 		
 		// values to string format:
 		const char fields_values_str[MAX_DEBUGFS_SIZE];
-		const char format_answer[] = "Start address: %u\nEnd address: %u\n";
-		size_t string_size = snprintf(NULL, 0, format_answer, vm_start, vm_end) + 1;
-		printk("StrSz: %d", string_size);
-		snprintf(fields_values_str, string_size, format_answer, vm_start, vm_end);
+		const char format_answer[] = "Start address: %u\nEnd address: %u\nFlags: %u\nFile offset: %u\n";
+		size_t string_size = snprintf(NULL, 0, format_answer, vm_start, vm_end, vm_flags, vm_offset) + 1;
+		snprintf(fields_values_str, string_size, format_answer, vm_start, vm_end, vm_flags, vm_offset);
 		copy_to_user(buff, fields_values_str, string_size);
 		read_status = string_size;
 	}
